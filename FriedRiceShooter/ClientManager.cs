@@ -15,18 +15,24 @@ namespace FriedRiceShooter
         //Definir o cliente
         bool Registered = false;
         UdpClient Me;
+        Player playah;
+
 
         //Definir variaveis e respetivos Locks
         public Dictionary<IPEndPoint, Ship> enemies = new Dictionary<IPEndPoint, Ship>();
-        private List<Message> MessagesToSend();
+        private List<Message> MessagesToSend;
         
         //Locks
         private Object ShipsLock = new Object();
         private Object MessageLock = new Object();
+        
 
-        public ClientManager()
+        public ClientManager(Player player)
         {
-            Me = new UdpClient(9999);
+            this.playah = player;
+            this.Me = new UdpClient(9999);
+
+            IPEndPoint origin = new IPEndPoint(IPAddress.Any, 0);
 
             //Making it able to listen
             Me.Client.EnableBroadcast = true;
@@ -37,9 +43,40 @@ namespace FriedRiceShooter
             Me.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveBuffer, 150000);
         }
 
-        public void Update(GameTime gameTime)
+        public void Update(GameTime gameTime, Player player)
         {
- 
+          
+
+            if (enemies.Count > 0)
+            {
+
+                foreach (IPEndPoint enemy in enemies.Keys)
+                {
+                    Message position = new Message("PX" + player.Position.X.ToString() + "Y" + player.Position.Y.ToString(), enemy);  
+                }
+                if (MessagesToSend.Count > 0)
+                {
+                    lock (MessageLock)
+                    {
+                        foreach (Message mess in MessagesToSend.ToArray())
+                        {
+                            Me.BeginSend(mess.message,
+                                mess.message.Length,
+                                mess.receiver,
+                                terminateSend,
+                                Me);
+                        }
+                    }
+                }
+                
+            }
+
+        }
+
+        private void terminateSend(IAsyncResult result)
+        {
+            UdpClient me = result.AsyncState as UdpClient;
+            me.EndSend(result);
         }
 
 

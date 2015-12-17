@@ -20,5 +20,10 @@ namespace FriedRiceShooter
             this.message = ToSend;
             this.receiver = ToReceive;
         }
+        public Message(string ToSend, IPEndPoint ToReceive)
+        {
+            this.message = Encoding.ASCII.GetBytes(ToSend);
+            this.receiver = ToReceive;
+        }
     }
 }

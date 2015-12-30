@@ -44,7 +44,7 @@ namespace FriedRiceShooter
             if (shooting)
             {
                 timer += gametime.ElapsedGameTime.TotalSeconds;
-                if (timer > 1)
+                if (timer > .3f)
                 {
                     shooting = false;
                 }

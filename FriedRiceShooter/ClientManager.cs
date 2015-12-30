@@ -17,7 +17,8 @@ namespace FriedRiceShooter
         bool Registered = false;
         UdpClient Me;
         Player playah;
-
+        Socket clientConnectionSocket;
+        Thread ConnectMe, ListenServer;
 
         //Definir variaveis e respetivos Locks
         public Dictionary<IPEndPoint, Ship> enemies = new Dictionary<IPEndPoint, Ship>();
@@ -30,51 +31,85 @@ namespace FriedRiceShooter
         public ClientManager(Player player)
         {
             this.playah = player;
-            this.Me = new UdpClient(9999);
+            //this.Me = new UdpClient(9999);
+
+            this.clientConnectionSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
 
             byte[] message = new byte[1024];
             //ServidorEndPoint
-            IPEndPoint origin = new IPEndPoint(IPAddress.Any, 0);
+            //IPEndPoint origin = new IPEndPoint(IPAddress.Parse("192.168.1.4"), 0);
             //Para usar como debugger
-            IPEndPoint DoubleOrigin = new IPEndPoint(IPAddress.Parse("127.0.0.1"),9919);
+            IPEndPoint DoubleOrigin = new IPEndPoint(IPAddress.Parse("192.168.1.4"), 9919);
 
-            Thread ConnectMe = new Thread(() => {
+            
+            ////Making it able to listen
+            //Me.Client.EnableBroadcast = true;
+            //Me.Client.Ttl = 2;
+
+            ////Giving it some time do do his thing
+            //Me.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.SendBuffer, 150000);
+            //Me.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveBuffer, 150000);
+
+            //Debuging part
+
+            this.ConnectMe = new Thread(() => {
                 //Inserir Comunicação com o servidor aqui
-                //Por enquanto vai ser só para adicionar um novo player do qual eu sei o IP
+                //Por enquanto vai ser só para conectar a um novo player do qual eu sei o IP
                 
                 message = Encoding.ASCII.GetBytes("HiMate");
-
-
-
-                Socket clientConnectionSocketSend = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-                clientConnectionSocketSend.SendTo(message, DoubleOrigin);
-                Thread.Sleep(100);
+                while (true)
+                {
+                    Socket clientConnectionSocketSend = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+                    clientConnectionSocketSend.SendTo(message, DoubleOrigin);
+                    Console.WriteLine("Tried...");
+                    Thread.Sleep(100);
+                }
                 /*
                  * 
                  */
-
             });
 
-            //Making it able to listen
-            Me.Client.EnableBroadcast = true;
-            Me.Client.Ttl = 2;
+            this.ListenServer = new Thread(() =>
+            {
+                EndPoint Doubleorigin;
+                try
+                {
+                 Doubleorigin = (EndPoint)DoubleOrigin;
+                }
+                catch (Exception)
+                {
+                    DoubleOrigin = new IPEndPoint(IPAddress.Parse("192.168.1.4"), 9918);
+                    Doubleorigin = (EndPoint)DoubleOrigin;
+                }
+                clientConnectionSocket.Bind(Doubleorigin);
 
-            //Giving it some time do do his thing
-            Me.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.SendBuffer, 150000);
-            Me.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveBuffer, 150000);
+                while (true)
+                {
+                    int size = this.clientConnectionSocket.ReceiveFrom(message, ref Doubleorigin);
 
-            //Debuging part
+                    string answer = Encoding.ASCII.GetString(message);
+
+                    if (message.ToString() != "")
+                    {
+                        Registered = true;
+                        Console.WriteLine(answer + "Did it!!");
+                    }
+                }
+            });
+
+            this.ConnectMe.Start();
+            this.ListenServer.Start();
         }
 
-        public void Update(GameTime gameTime, Player player)
+        public void Update(GameTime gameTime)
         {
-          
+            //if (Registered && ConnectMe.IsAlive)
+            //{
+            //    ConnectMe.Abort();
+            //    ListenServer.Abort();
+            //}
 
-            if (enemies.Count > 0)
-            {
-                
-            }
-
+                      
         }
 
         private void terminateSend(IAsyncResult result)

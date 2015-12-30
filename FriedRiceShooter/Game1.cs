@@ -13,6 +13,7 @@ namespace FriedRiceShooter
         SpriteBatch spriteBatch;
         Player mainShip;
         public Texture2D ShipTexture, BulletTexture;
+        ClientManager Conects;
 
 
         public Game1()
@@ -41,7 +42,7 @@ namespace FriedRiceShooter
             //Initialize ships here, for loading less resources
             mainShip = new Player(new Vector2(graphics.PreferredBackBufferWidth / 4, graphics.PreferredBackBufferHeight / 2), graphics,ShipTexture,BulletTexture, spriteBatch);
 
-
+            Conects = new ClientManager(mainShip);
         }
 
         protected override void UnloadContent(){}
@@ -51,7 +52,7 @@ namespace FriedRiceShooter
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
             mainShip.Update(gameTime);
-
+            Conects.Update(gameTime);
             base.Update(gameTime);
         }
 

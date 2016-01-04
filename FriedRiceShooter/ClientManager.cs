@@ -14,16 +14,18 @@ namespace FriedRiceShooter
     class ClientManager
     {
         //Definir o cliente
-        bool Registered = false;
-        UdpClient Me;
+        Boolean Registred;
         Player playah;
-        Socket clientConnectionSocket;
+        Socket ConnectionSocket;
         Thread ConnectMe, ListenServer;
 
-        //Definir variaveis e respetivos Locks
+        //Definir variaveis
+        IPEndPoint Server;
+        IPEndPoint SReceiver;
         public Dictionary<IPEndPoint, Ship> enemies = new Dictionary<IPEndPoint, Ship>();
         
         //Locks
+        private Object ClientLock = new Object();
         private Object ShipsLock = new Object();
         private Object MessageLock = new Object();
         
@@ -31,71 +33,84 @@ namespace FriedRiceShooter
         public ClientManager(Player player)
         {
             this.playah = player;
-            //this.Me = new UdpClient(9999);
 
-            this.clientConnectionSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-
-            byte[] message = new byte[1024];
-            //ServidorEndPoint
-            //IPEndPoint origin = new IPEndPoint(IPAddress.Parse("192.168.1.4"), 0);
-            //Para usar como debugger
-            IPEndPoint DoubleOrigin = new IPEndPoint(IPAddress.Parse("192.168.1.4"), 9919);
-
-            
-            ////Making it able to listen
-            //Me.Client.EnableBroadcast = true;
-            //Me.Client.Ttl = 2;
-
-            ////Giving it some time do do his thing
-            //Me.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.SendBuffer, 150000);
-            //Me.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveBuffer, 150000);
-
-            //Debuging part
+            this.ConnectionSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            Byte[] message = new Byte[1024];
+            this.Server = new IPEndPoint(IPAddress.Parse("25.9.152.191"), 904);
+            this.SReceiver = new IPEndPoint(IPAddress.Parse("255.0.0.0"), 905);
+            this.ConnectionSocket.Bind(SReceiver);
 
             this.ConnectMe = new Thread(() => {
-                //Inserir Comunicação com o servidor aqui
-                //Por enquanto vai ser só para conectar a um novo player do qual eu sei o IP
-                
-                message = Encoding.ASCII.GetBytes("HiMate");
+
+                lock (MessageLock)
+                {
+                    message = Encoding.ASCII.GetBytes("Client Connected...");
+                }
+
+                Socket clientSocketSend = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
                 while (true)
                 {
-                    Socket clientConnectionSocketSend = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-                    clientConnectionSocketSend.SendTo(message, DoubleOrigin);
+                    clientSocketSend.SendTo(message, Server);
                     Console.WriteLine("Tried...");
                     Thread.Sleep(100);
                 }
-                /*
-                 * 
-                 */
             });
 
             this.ListenServer = new Thread(() =>
             {
+
                 EndPoint Doubleorigin;
-                try
-                {
-                 Doubleorigin = (EndPoint)DoubleOrigin;
-                }
-                catch (Exception)
-                {
-                    DoubleOrigin = new IPEndPoint(IPAddress.Parse("192.168.1.4"), 9918);
-                    Doubleorigin = (EndPoint)DoubleOrigin;
-                }
-                clientConnectionSocket.Bind(Doubleorigin);
+                Doubleorigin = (EndPoint)this.SReceiver;
+                ConnectionSocket.Bind(Doubleorigin);
 
                 while (true)
                 {
-                    int size = this.clientConnectionSocket.ReceiveFrom(message, ref Doubleorigin);
-
-                    string answer = Encoding.ASCII.GetString(message);
+                    int size = this.ConnectionSocket.ReceiveFrom(message, ref Doubleorigin);
+                    string answer = "";
 
                     if (message.ToString() != "")
                     {
-                        Registered = true;
-                        Console.WriteLine(answer + "Did it!!");
+                        if (message[0] == 'P' && !Registred)
+                        {
+                            for (int i = 1; i < size; i++)
+                            {
+                                answer += message[i].ToString();
+                            }
+                            lock (this.ClientLock)
+                            {
+                                this.Server = new IPEndPoint(Server.Address, int.Parse(answer));
+                                this.Registred = true;
+                            }
+
+                            this.ConnectMe.Abort();
+                        }
+                        else
+                        {
+                            Boolean newClient = true;
+                            for (int i = 2; i < size; i++)
+                            {
+                                answer += message[i].ToString();
+                            }
+
+                            int IP = int.Parse(answer);
+
+                            foreach(IPEndPoint Adress in enemies.Keys )
+                            {
+                                if (int.Parse(Adress.Address.ToString()) == IP)
+                                    newClient = false;
+                            }
+
+                            if (newClient)
+                            {
+                                AddEnemy(IP.ToString());
+                            }
+                        }
+                        Console.WriteLine("Received: " + message.ToString() + "\nFrom " + this.SReceiver.Address.ToString());
+                        this.ConnectionSocket.SendTo(Encoding.ASCII.GetBytes("00"), this.Server);
                     }
                 }
             });
+
 
             this.ConnectMe.Start();
             this.ListenServer.Start();
@@ -103,20 +118,20 @@ namespace FriedRiceShooter
 
         public void Update(GameTime gameTime)
         {
-            //if (Registered && ConnectMe.IsAlive)
-            //{
-            //    ConnectMe.Abort();
-            //    ListenServer.Abort();
-            //}
+            //Enviar a posição e rotação a todos os oponentes
 
-                      
+            string message = "P";
+            message += "X" + playah.Position.X + "Y" + playah.Position.Y + "R" + playah.rotation;
+
+            byte[] messag = Encoding.ASCII.GetBytes(message);
+            
+            foreach (IPEndPoint ip in enemies.Keys)
+            {
+                this.ConnectionSocket.SendTo(messag, (EndPoint)ip);
+            }
+
         }
 
-        private void terminateSend(IAsyncResult result)
-        {
-            UdpClient me = result.AsyncState as UdpClient;
-            me.EndSend(result);
-        }
 
         private void AddEnemy( string IP )
         {
